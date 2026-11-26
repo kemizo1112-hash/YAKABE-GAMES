@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>YAKABE PANIC! - 矢加部の街</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; overflow:hidden; background:#101820; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; color:#fff; }
+  #game { position:fixed; inset:0; }
+  canvas { display:block; width:100%; height:100%; }
+  #hud { position:fixed; inset:0; pointer-events:none; }
+  .panel { position:absolute; top:14px; left:14px; padding:11px 14px; border:2px solid #fff8; border-radius:14px; background:#101820c9; box-shadow:0 5px 18px #0005; }
+  #title { font-weight:1000; font-size:clamp(17px,3vw,25px); letter-spacing:.04em; color:#ffe66d; text-shadow:2px 2px #d44; }
+  #stats { margin-top:5px; font-size:14px; font-weight:800; }
+  #hint { position:absolute; top:14px; right:14px; max-width:270px; text-align:right; padding:10px 13px; border-radius:12px; background:#101820c9; border:1px solid #fff7; font-size:12px; line-height:1.55; }
+  #message { position:absolute; left:50%; top:23%; transform:translateX(-50%); padding:12px 20px; border-radius:16px; background:#101820dd; border:2px solid #ffe66d; font-weight:1000; font-size:clamp(18px,4vw,30px); text-align:center; text-shadow:2px 2px #d44; max-width:90vw; }
+  #bottom { position:absolute; left:50%; bottom:16px; transform:translateX(-50%); padding:8px 13px; border-radius:12px; background:#101820bb; font-size:12px; white-space:nowrap; }
+  #restart { pointer-events:auto; border:0; border-radius:999px; padding:9px 15px; margin-left:8px; background:#ffe66d; color:#241d16; font-weight:900; cursor:pointer; }
+  #mission { position:absolute; top:84px; left:14px; max-width:min(380px,62vw); padding:8px 12px; border-radius:12px; background:#3a2a05e6; border:2px solid #ffe66d; font-size:13px; font-weight:800; line-height:1.5; display:none; }
+  #mute { position:absolute; top:150px; right:14px; width:42px; height:42px; border-radius:50%; border:1px solid #fff8; background:#101820c9; font-size:20px; pointer-events:auto; cursor:pointer; }
+  #radar { position:absolute; top:14px; right:295px; width:100px; height:100px; border-radius:50%; background:#101820c9; border:2px solid #7dffb0aa; }
+  #radarTxt { position:absolute; top:118px; right:295px; width:100px; text-align:center; font-size:11px; font-weight:800; color:#ff9a9a; text-shadow:1px 1px #000; }
+  @media (pointer:coarse) { #radar { right:215px; width:88px; height:88px; } #radarTxt { right:215px; width:88px; top:106px; } }
+  #touch { position:absolute; bottom:20px; left:18px; display:none; pointer-events:auto; width:130px; height:130px; border-radius:50%; background:#ffffff25; border:2px solid #ffffff77; touch-action:none; }
+  #stick { position:absolute; width:48px; height:48px; left:39px; top:39px; border-radius:50%; background:#ffe66dcc; border:2px solid white; }
+  #jump { position:absolute; bottom:34px; right:22px; width:82px; height:82px; border:2px solid white; border-radius:50%; background:#ff5d5dce; color:white; font-weight:1000; font-size:15px; pointer-events:auto; display:none; touch-action:none; }
+  #throw { position:absolute; bottom:128px; right:22px; width:76px; height:76px; border:2px solid white; border-radius:50%; background:#e6a33bde; color:#24180a; font-weight:1000; font-size:13px; pointer-events:auto; display:none; touch-action:none; }
+  @media (pointer:coarse) { #touch,#jump,#throw { display:block; } #hint { max-width:190px; font-size:11px; } #bottom { bottom:160px; } }
+  #overlay { position:fixed; inset:0; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#081018c9; padding:20px; z-index:5; }
+  #card { margin:auto; max-width:520px; width:100%; background:linear-gradient(145deg,#24394a,#121c28); border:3px solid #ffe66d; border-radius:24px; padding:25px; text-align:center; box-shadow:0 15px 60px #0009; }
+  #card h1 { margin:0 0 8px; color:#ffe66d; font-size:clamp(27px,7vw,43px); }
+  #card p { line-height:1.7; margin:10px 0; }
+  #start { border:0; border-radius:999px; padding:13px 28px; background:#ffdf4d; color:#211b10; font-size:18px; font-weight:1000; cursor:pointer; margin-top:8px; }
+  .small { opacity:.75; font-size:12px; }
+  #start { touch-action:manipulation; }
+  #help { margin-top:12px; text-align:left; font-size:13px; line-height:1.65; }
+  #help summary { cursor:pointer; font-weight:800; text-align:center; padding:8px; border-radius:10px; background:#ffffff22; }
+  #help .box { margin-top:8px; padding:10px 12px; border-radius:12px; background:#0006; }
+  #help h3 { margin:8px 0 2px; font-size:14px; color:#ffe66d; }
+  #help ol, #help ul { margin:2px 0 6px; padding-left:20px; }
+  @media (max-height:520px) { #card { padding:12px 16px; } #card h1 { font-size:24px; margin-bottom:2px; } #card p { margin:4px 0; line-height:1.45; font-size:13px; } #start { padding:10px 24px; font-size:16px; } }
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+  <div class="panel"><div id="title">YAKABE PANIC!</div><div id="stats">パン 0　|　敵 0 / 12　|　150秒</div></div>
+  <div id="hint">前進・後退：W / S　旋回：A / D（矢印キーも可）<br>ジャンプ：Space　パン投げ：E<br>空中でE＝必殺技！<br>視点：画面ドラッグ／ピンチでズーム<br>スマホ：左の丸＋右のボタン</div>
+  <div id="message">パンを集めて敵に投げろ！</div>
+  <canvas id="radar" width="200" height="200" style="display:none"></canvas><div id="radarTxt" style="display:none"></div>
+  <div id="mission"></div>
+  <button id="mute">🔊</button>
+  <div id="bottom">障害物にぶつかると少し足止め！ <button id="restart">やり直す</button></div>
+  <div id="touch"><div id="stick"></div></div>
+  <button id="jump">ジャンプ！</button>
+  <button id="throw">パン投げ！</button>
+</div>
+<div id="overlay">
+  <div id="card">
+    <h1>YAKABE PANIC!</h1>
+    <p><b>矢加部、焼きそばパンを救え。</b></p>
+    <p>謎の顔をした矢加部が、現代の街を大暴走！<br>150秒以内に焼きそばパンを集めて、広い街のワル12人を倒そう！<br>路地の先にも大通りが！ジャンプ中にEで必殺技！<br>パンは E キーで投げて攻撃できるぞ！</p>
+    <p class="small">PC：W/Sで前進・後退、A/Dで旋回、Spaceでジャンプ、Eでパン投げ<br>スマホ：左のスティック（上下＝前後、左右＝旋回）、右のボタンで操作</p>
+    <button id="start">ゲームスタート！</button>
+    <p class="small" id="count"></p>
+    <p class="small" id="nojs">⚠ 押しても反応しない場合は、このファイルを Safari / Chrome で開いてください（LINE・メール・「ファイル」アプリのプレビューでは動きません）。ネット接続が必要です。</p>
+    <details id="help"><summary>❓ ヘルプ（遊び方・iPhoneでの開き方）</summary><div class="box">
+     <h3>🎮 遊び方</h3>
+     <ul><li>W/S（スティック上下）で前進・後退、A/D（スティック左右）で旋回</li><li>Space＝ジャンプ、E＝パン投げ（空中でE＝必殺技）</li><li>画面ドラッグで視点を回転、ピンチでズーム</li><li>パンを拾うと一時的にダッシュ。ミッションをクリアするとパン+5個</li></ul>
+     <h3>📱 iPhone：ファイルで受け取って遊ぶ（LINE → ファイル → Chrome）</h3>
+     <b>① LINEのファイルを保存する</b>
+     <ol><li>LINEのトークでファイル（ZIP または HTML）をタップ</li><li>左下（または右上）の共有ボタン <b>□↑</b> を押す</li><li>「“ファイル”に保存」を選び、保存場所（このiPhone内 など）を決めて「保存」</li></ol>
+     <b>② ZIPを解凍する（ZIPの場合）</b>
+     <ol><li>「ファイル」アプリを開き、保存したZIPをタップ</li><li>同じ場所に同名のフォルダができれば解凍完了（できないときはZIPを長押し→「展開」）</li><li>フォルダを開いて、中のHTMLファイル（yakabe_panic〜.html）を探す</li></ol>
+     <b>③ Chromeで開く</b>
+     <ol><li>HTMLファイルを長押し →「共有」</li><li>共有メニューに「Chrome」があれば選ぶ（なければ「その他」から探す）</li></ol>
+     <b>毎回Chromeで開きたい場合</b>
+     <ol><li>「設定」→「アプリ」→「Chrome」→「デフォルトのブラウザApp」で「Chrome」を選ぶ</li></ol>
+     <h3>⚠ 動かないとき</h3>
+     <ul><li>LINE・メール・「ファイル」アプリのプレビュー画面ではJavaScriptが動かず、ゲームが始まりません。必ずChromeやSafariで開いてください（ファイルからうまく開けない場合は、リンク（URL）にして開くと確実です）</li><li>通信環境（Wi-Fi/モバイル）とデータ節約・省電力モードを確認</li><li>画面の赤い枠にエラーが出たら、その文章を作者に伝えてください</li></ul>
+    </div></details>
+    <p class="small">※ブラウザで動く試作ゲームです。音はありません。</p>
+  </div>
+</div>
+<script>
+window.__fatal=function(m){var c=document.getElementById('card');if(!c)return;var e=document.getElementById('err');if(!e){e=document.createElement('div');e.id='err';e.style.cssText='margin-top:12px;padding:10px;border-radius:12px;background:#5a1a1a;border:1px solid #f88;font-size:13px;line-height:1.6;text-align:left';c.appendChild(e);}e.innerHTML='<b>ゲームを起動できませんでした</b><br>'+m+'<br>【対処】①通信（Wi-Fi/モバイル）を確認 ②広告・コンテンツブロッカーやデータ節約モードをオフ ③省電力モードをオフ ④iPhoneはロックダウンモードをオフ、設定>Safari>詳細でJavaScriptを有効に ⑤ブラウザを最新にして開き直す';};
+(function(){
+ var nj=document.getElementById('nojs'); if(nj) nj.remove();
+ var b=document.getElementById('start'), c=document.getElementById('count'), left=5, t;
+ window.__want=false;
+ function go(){ clearInterval(t); c.textContent=''; if(window.__yakabeReady){ window.__start&&window.__start(); } else { window.__want=true; b.textContent='読み込み中…'; } }
+ b.addEventListener('click',go); b.addEventListener('pointerup',go);
+ c.textContent=left+'秒後に自動スタート…';
+ var hp=document.getElementById('help');
+ t=setInterval(function(){ if(hp&&hp.open){ left=5; c.textContent='ヘルプを閉じると自動スタートします'; return; } left--; if(left<=0){ go(); } else c.textContent=left+'秒後に自動スタート…'; },1000);
+ var last='';
+ function err(m){ if(m!==last){ last=m; window.__fatal(m); } }
+ window.addEventListener('error',function(e){ err('エラー: '+(e.message||'')+(e.lineno?' (行'+e.lineno+')':'')); });
+ window.addEventListener('unhandledrejection',function(e){ err('エラー: '+((e.reason&&e.reason.message)||e.reason)); });
+})();
+setTimeout(function(){if(!window.__yakabeReady)window.__fatal('読み込みに時間がかかっています。');},15000);
+</script>
+<script type="module">
+(async()=>{
+// three.js を複数のCDNから順に読み込む（ブロックされた場合の対策）
+let THREE=null;
+for(const u of ['https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js','https://unpkg.com/three@0.160.0/build/three.module.js','https://esm.sh/three@0.160.0']){
+ try{THREE=await import(u);break;}catch(e){console.warn(e);}
+}
+if(!THREE){window.__fatal('3Dライブラリを読み込めませんでした。');return;}
+
+const root = document.getElementById('game');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9bd8f2);
+scene.fog = new THREE.Fog(0x9bd8f2, 38, 105);
+const camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, .1, 180);
+const mobile=matchMedia('(pointer:coarse)').matches;
+let renderer;
+try{renderer=new THREE.WebGLRenderer({antialias:!mobile,powerPreference:'high-performance'});}
+catch(e1){try{renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'low-power'});}catch(e2){window.__fatal('この端末・設定ではWebGL（3D表示）が使えません。');return;}}
+renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1.5:2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x607080,2.0));
+const sun = new THREE.DirectionalLight(0xffffff,2.1);
+sun.position.set(-18,32,14); sun.castShadow=true; sun.shadow.mapSize.set(mobile?1024:2048,mobile?1024:2048);
+sun.shadow.camera.left=-45; sun.shadow.camera.right=45; sun.shadow.camera.top=45; sun.shadow.camera.bottom=-45;
+scene.add(sun);scene.add(sun.target);
+
+const mat=(color,roughness=.85)=>new THREE.MeshStandardMaterial({color,roughness});
+const grass=mat(0x6eaa69), asphalt=mat(0x454b52), sidewalk=mat(0xb9b8aa), white=mat(0xf5f1df);
+const road = new THREE.Mesh(new THREE.PlaneGeometry(170,170),grass); road.rotation.x=-Math.PI/2; road.position.y=-.12; road.receiveShadow=true; scene.add(road);
+const street = new THREE.Mesh(new THREE.PlaneGeometry(17,140),asphalt); street.rotation.x=-Math.PI/2; street.position.y=-.08; street.receiveShadow=true; scene.add(street);
+const alleyMat=mat(0x5b6068), yellow=mat(0xf2c230);
+const ALLEYS=[]; for(let z=-56;z<=56;z+=14) ALLEYS.push(z);
+// 歩ける場所：大通り＋路地
+const walk=(x,z)=>{ if(z<-67||z>66) return false; if(Math.abs(x)<=9.8||Math.abs(Math.abs(x)-56)<=9.8) return true; if(Math.abs(x)>47) return false; return ALLEYS.some(a=>Math.abs(z-a)<=1.7); };
+const mv=(pos,dx,dz)=>{ if(walk(pos.x+dx,pos.z)) pos.x+=dx; if(walk(pos.x,pos.z+dz)) pos.z+=dz; };
+for(let x of [-9.3,9.3]){
+ const p=new THREE.Mesh(new THREE.BoxGeometry(1.8,.25,140),sidewalk); p.position.set(x,.02,0); p.receiveShadow=true; scene.add(p);
+}
+for(const a of ALLEYS) for(const sd of [-1,1]){
+ const p=new THREE.Mesh(new THREE.PlaneGeometry(38,3.6),alleyMat); p.rotation.x=-Math.PI/2; p.position.set(sd*28.5,-.06,a); p.receiveShadow=true; scene.add(p);
+}
+for(const x of [-.2,.2]){ const line=new THREE.Mesh(new THREE.BoxGeometry(.12,.025,140),yellow); line.position.set(x,.015,0); scene.add(line); }
+function box(w,h,d,material,x,y,z){
+ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; scene.add(m); return m;
+}
+const buildingColors=[0xe9b68c,0xd6dce5,0xf0d779,0xb7d5c9,0xd4b8db,0xc8c0b2,0xe8c8c0,0xa9c4e0];
+const awnC=[0xd94c42,0x2f7fc1,0x3a9a5c,0xe0a23c,0x8a5bc0], signC=[0xffdf55,0xff8a5c,0x7fd1ae,0xf5f5f5];
+const UB=new THREE.BoxGeometry(1,1,1), IM={};
+const IMAT={glass:new THREE.MeshStandardMaterial({color:0x7fb8d4,roughness:.12,metalness:.5}),frame:mat(0x2d3640,.6),trim:mat(0xf1ece0,.8),awn:mat(0xffffff,.7),dark:mat(0x5d646c,.7),sign:mat(0xffffff,.6)};
+function put(k,x,y,z,w,h,d,ry=0,col){(IM[k]=IM[k]||[]).push([x,y,z,w,h,d,ry,col]);}
+// 建物の1面を飾る：窓（枠・ガラス・窓台）、バルコニー、1階の店（ガラス・日よけ・看板）または扉
+function decorate(cx,cz,w,d,h,nx,nz,shop,ci){
+ const len=nx?d:w, hd=nx?w/2:d/2, tx=nx?0:1, tz=nx?1:0, ry=nx?Math.PI/2:0;
+ const n=Math.max(2,Math.floor(len/2.3)), step=len/n;
+ const P=(k,sv,o,y,W,H,D,c)=>put(k,cx+nx*(hd+o)+tx*sv,y,cz+nz*(hd+o)+tz*sv,W,H,D,ry,c);
+ for(let i=0;i<n;i++){ const sv=(i+.5)*step-len/2;
+  for(let y=4.6;y<h-1.1;y+=2.6){
+   P('frame',sv,.04,y,1.3,1.5,.12); P('glass',sv,.1,y,1.1,1.3,.1); P('trim',sv,.14,y-.8,1.6,.1,.3);
+   if(shop&&(i+Math.round(y))%3===0){P('trim',sv,.5,y-.8,1.8,.1,.9);P('dark',sv,.9,y-.45,1.8,.55,.05);}
+  }
+ }
+ if(shop){
+  const sw=len*.8; P('frame',0,.04,1.35,sw+.2,2.1,.12); P('glass',0,.1,1.35,sw,1.9,.1);
+  for(let j=0;j<6;j++) P('awn',-sw/2+(j+.5)*sw/6,.55,2.6,sw/6,.14,1.1,j%2?0xffffff:awnC[ci%awnC.length]);
+  P('sign',0,.1,3.0,len*.6,.5,.12,signC[ci%signC.length]);
+ } else { P('dark',0,.06,1.1,1.2,2.2,.12); }
+ P('trim',0,.1,3.4,len+.2,.2,.2);
+}
+function makeBuilding(x,z,w,d,h,fd,ci){
+ box(w,h,d,mat(buildingColors[ci%buildingColors.length]),x,h/2,z); box(w+.12,3.3,d+.12,mat(0x6f6a64),x,1.65,z);
+ for(const sx of [-1,1]) for(const sz of [-1,1]) put('trim',x+sx*w/2,h/2,z+sz*d/2,.35,h,.35);
+ put('trim',x,h+.15,z,w+.5,.3,d+.5);
+ if(Math.random()<.6) put('dark',x+(Math.random()-.5)*w*.4,h+.65,z+(Math.random()-.5)*d*.4,1.3,.7,1);
+ if(Math.random()<.4){put('dark',x,h+1.2,z-1.5,1.3,1.8,1.3);put('trim',x,h+2.2,z-1.5,1.5,.15,1.5);}
+ decorate(x,z,w,d,h,fd,0,true,ci); decorate(x,z,w,d,h,0,1,false,ci); decorate(x,z,w,d,h,0,-1,false,ci);
+}
+for(const [cx,wmin,hmin,hr,fd0] of [[20,7,6.5,9,-1],[36,8,7,8,1],[76,7,6.5,9,-1]]) for(const side of [-1,1]) for(let z=-63;z<=63;z+=14){
+ makeBuilding(side*(cx+Math.random()*2),z,wmin+Math.random()*3,10,hmin+Math.random()*hr,fd0*side,Math.floor(Math.random()*8));
+}
+{ const o=new THREE.Object3D();
+ for(const k in IM){ const L=IM[k], m=new THREE.InstancedMesh(UB,IMAT[k],L.length);
+  L.forEach((a,i)=>{o.position.set(a[0],a[1],a[2]);o.rotation.y=a[6];o.scale.set(a[3],a[4],a[5]);o.updateMatrix();m.setMatrixAt(i,o.matrix);if(a[7]!==undefined)m.setColorAt(i,new THREE.Color(a[7]));});
+  m.frustumCulled=false; m.castShadow=(k==='trim'||k==='dark'); m.receiveShadow=true; scene.add(m); }
+}
+for(let side of [-1,1]) for(let z=-65;z<=65;z+=13){
+ box(.38,2.0,.38,mat(0x765039),side*10.4,1.0,z);
+ const crown=new THREE.Mesh(new THREE.SphereGeometry(1.05,10,8),mat(0x3d8b55)); crown.position.set(side*10.4,2.85,z); crown.castShadow=true; scene.add(crown);
+}
+// crosswalk
+for(let i=-4;i<=4;i++) box(1.15,.035,4.3,white,i*1.55,.02,-15);
+
+// 路地の先の新しい大通り（大通りのコピー）x=±56
+for(const cx of [-56,56]){
+ const st=new THREE.Mesh(new THREE.PlaneGeometry(17,140),asphalt); st.rotation.x=-Math.PI/2; st.position.set(cx,-.08,0); st.receiveShadow=true; scene.add(st);
+ for(const dx of [-9.3,9.3]){ const sw=new THREE.Mesh(new THREE.BoxGeometry(1.8,.25,140),sidewalk); sw.position.set(cx+dx,.02,0); sw.receiveShadow=true; scene.add(sw); }
+ for(const dx of [-.2,.2]){ const ln=new THREE.Mesh(new THREE.BoxGeometry(.12,.025,140),yellow); ln.position.set(cx+dx,.015,0); scene.add(ln); }
+ for(let i=-4;i<=4;i++) box(1.15,.035,4.3,white,cx+i*1.55,.02,-15);
+ for(const sd of [-1,1]) for(let z=-65;z<=65;z+=13){
+  box(.38,2.0,.38,mat(0x765039),cx+sd*10.4,1.0,z);
+  const cr=new THREE.Mesh(new THREE.SphereGeometry(1.05,10,8),mat(0x3d8b55)); cr.position.set(cx+sd*10.4,2.85,z); cr.castShadow=true; scene.add(cr);
+ }
+}
+// Player: a more human-shaped low-poly character with a deliberately goofy face.
+const player=new THREE.Group(); scene.add(player);
+const skin=mat(0xf0bd98), hair=mat(0x29252b), shirt=mat(0x3b7dc4), pants=mat(0x30374a), shoe=mat(0x24242a), eye=mat(0xffffff), pupil=mat(0x171717), mouth=mat(0x6b2020), red=mat(0xe94b35);
+function addLimb(parent, radiusTop, radiusBottom, length, material, x,y,z, tilt=0){
+ const mesh=new THREE.Mesh(new THREE.CylinderGeometry(radiusTop,radiusBottom,length,9),material);
+ mesh.position.set(x,y,z); mesh.rotation.z=tilt; mesh.castShadow=true; parent.add(mesh); return mesh;
+}
+const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.39,.72,5,10),shirt);
+torso.position.y=1.58; torso.castShadow=true; player.add(torso);
+const neck=new THREE.Mesh(new THREE.CylinderGeometry(.14,.16,.22,9),skin); neck.position.y=2.12; player.add(neck);
+const headG=new THREE.Group(); player.add(headG); hair.side=THREE.DoubleSide;
+const head=new THREE.Mesh(new THREE.SphereGeometry(.48,16,12),skin);
+head.position.y=2.58; head.scale.set(1.0,1.08,.92); head.castShadow=true; headG.add(head);
+const haircap=new THREE.Mesh(new THREE.SphereGeometry(.53,16,10,0,Math.PI*2,0,Math.PI*.55),hair);
+haircap.position.set(0,2.74,0); haircap.scale.set(1.08,1,.96); headG.add(haircap);
+for(let i=0;i<5;i++){
+ const sp=new THREE.Mesh(new THREE.ConeGeometry(.12,.29,5),hair);
+ sp.position.set((i-2)*.15,3.04+(i%2)*.07,.03); sp.rotation.z=(i-2)*-.22; headG.add(sp);
+}
+for(let s of [-1,1]){
+ const ear=new THREE.Mesh(new THREE.SphereGeometry(.12,9,8),skin); ear.position.set(s*.47,2.57,0); ear.scale.set(.6,1,.7); headG.add(ear);
+ const e=new THREE.Mesh(new THREE.SphereGeometry(.13,12,10),eye); e.position.set(s*.19,2.62,.424); e.scale.set(.88,1.12,.48); headG.add(e);
+ const p=new THREE.Mesh(new THREE.SphereGeometry(.06,10,8),pupil); p.position.set(s*.19+.025,2.61,.485); headG.add(p);
+ const brow=new THREE.Mesh(new THREE.BoxGeometry(.25,.055,.055),hair); brow.position.set(s*.19,2.82,.44); brow.rotation.z=s*.14; headG.add(brow);
+}
+const nose=new THREE.Mesh(new THREE.SphereGeometry(.085,10,8),skin); nose.position.set(0,2.49,.47); nose.scale.set(.85,.75,.7); headG.add(nose);
+const grin=new THREE.Mesh(new THREE.TorusGeometry(.16,.035,6,16,Math.PI),mouth); grin.position.set(0,2.38,.445); grin.rotation.z=Math.PI; headG.add(grin);
+const leftArm=new THREE.Group(); leftArm.position.set(-.43,1.88,0); player.add(leftArm);
+const rightArm=new THREE.Group(); rightArm.position.set(.43,1.88,0); player.add(rightArm);
+for(const [group,s] of [[leftArm,-1],[rightArm,1]]){
+ addLimb(group,.115,.14,.48,shirt,0,-.24,0,s*.12);
+ const elbow=new THREE.Mesh(new THREE.SphereGeometry(.105,8,8),skin); elbow.position.set(0,-.49,0); group.add(elbow);
+ addLimb(group,.085,.105,.48,skin,0,-.72,0,-s*.08);
+}
+const leftLeg=new THREE.Group(); leftLeg.position.set(-.2,1.05,0); player.add(leftLeg);
+const rightLeg=new THREE.Group(); rightLeg.position.set(.2,1.05,0); player.add(rightLeg);
+for(const [group,s] of [[leftLeg,-1],[rightLeg,1]]){
+ addLimb(group,.16,.19,.58,pants,0,-.29,0,0);
+ const knee=new THREE.Mesh(new THREE.SphereGeometry(.14,8,8),pants); knee.position.set(0,-.58,0); group.add(knee);
+ addLimb(group,.13,.15,.42,pants,0,-.79,0,0);
+ const boot=new THREE.Mesh(new THREE.BoxGeometry(.3,.17,.48),shoe); boot.position.set(0,-1.02,.09); boot.castShadow=true; group.add(boot);
+}
+player.position.set(0,0,60);
+
+// 焼きそばパン（新モデル）：ふっくらコッペパンに、てんこ盛りの焼きそば
+const BM={bun:mat(0xe8b25f,.6),noodle:[mat(0xc77a2c,.35),mat(0x8f3f14,.3)],red:mat(0xe0303a,.5),green:mat(0x2f8a3a,.6),cab:mat(0x9bd05a,.6),wrap:mat(0xfff0c8,.8),stripe:mat(0xd8343a,.7)};
+function createBread(){
+ const g=new THREE.Group(), R=a=>(Math.random()-.5)*a;
+ const bun=new THREE.Mesh(new THREE.CapsuleGeometry(.3,.85,8,16),BM.bun); bun.rotation.z=Math.PI/2; bun.scale.set(.85,1,1); bun.position.y=-.02; bun.castShadow=true; g.add(bun);
+ for(let i=0;i<11;i++){ // 麺：パンの上にかぶさるアーチ
+  const x=-.5+i*.1, h=.34+Math.random()*.14, pts=[];
+  for(let k=0;k<=6;k++){const t=k/6; pts.push(new THREE.Vector3(x+R(.05)+Math.sin(k*2+i)*.03,.1+Math.sin(t*Math.PI)*h,(t-.5)*.7));}
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),16,.05,6),BM.noodle[i%2]));
+ }
+ for(let i=0;i<5;i++){const c=new THREE.Mesh(new THREE.SphereGeometry(.09,6,5),BM.cab);c.scale.set(1.3,.4,1);c.position.set(R(.8),.38+Math.random()*.12,R(.35));c.rotation.y=Math.random()*3;g.add(c);}
+ for(let i=0;i<7;i++){const r=new THREE.Mesh(new THREE.BoxGeometry(.16,.04,.06),BM.red);r.position.set(R(.75),.44+Math.random()*.1,R(.3));r.rotation.y=Math.random()*3;g.add(r);}
+ for(let i=0;i<14;i++){const a=new THREE.Mesh(new THREE.BoxGeometry(.035,.02,.035),BM.green);a.position.set(R(.8),.5+Math.random()*.06,R(.3));g.add(a);}
+ return g;
+}
+const pickups=[];
+function makeBread(x,z){ const g=createBread(); g.scale.setScalar(1.25); g.position.set(x,.9,z); scene.add(g); pickups.push(g); }
+[[-5,52],[4,40],[-5,24],[5,10],[0,-5],[-5,-22],[5,-38],[0,-52],[-3,-62],[20,28],[-24,14],[30,0],[-18,-14],[24,-28],[-34,-42],[52,40],[60,10],[54,-20],[-52,30],[-60,0],[-54,-40]].forEach(p=>makeBread(...p));
+// コーン
+const obstacles=[], red2=mat(0xe94b35);
+for(const [x,z] of [[-3,48],[3,32],[-5,8],[5,-12],[-5,-32],[0,-50],[22,14],[-26,0],[28,-28],[-20,-42],[54,25],[-58,-10],[60,-45]]){
+ const g=new THREE.Group();
+ const base=new THREE.Mesh(new THREE.CylinderGeometry(.42,.48,.14,8),mat(0x333333)); base.position.y=.08; g.add(base);
+ const cone=new THREE.Mesh(new THREE.CylinderGeometry(.04,.32,.85,8),red2); cone.position.y=.55; cone.castShadow=true; g.add(cone);
+ g.position.set(x,0,z); scene.add(g); obstacles.push(g);
+}
+// 車（前方=+Z）
+const glassM=new THREE.MeshStandardMaterial({color:0x9fd3e6,roughness:.15,metalness:.4}), darkM=mat(0x23262b,.6), silverM=mat(0xbfc4cc,.3), plateM=mat(0xf5f5f0);
+const lightM=new THREE.MeshStandardMaterial({color:0xfff3c4,emissive:0xffe9a0,emissiveIntensity:.8}), tailM=new THREE.MeshStandardMaterial({color:0xd92b2b,emissive:0x8a0f0f,emissiveIntensity:.8});
+function makeCar(color){
+ const g=new THREE.Group(), body=new THREE.MeshStandardMaterial({color,roughness:.35,metalness:.25});
+ const add=(w,h,d,m,x,y,z)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(x,y,z);b.castShadow=true;g.add(b);};
+ add(2,.6,4.3,body,0,.66,0); add(1.9,.16,1.1,body,0,1.02,1.4); add(1.9,.16,.9,body,0,1.02,-1.5);
+ add(1.78,.5,2.0,glassM,0,1.3,-.15); add(1.7,.1,1.8,body,0,1.58,-.15);
+ add(2.05,.22,.18,darkM,0,.42,2.2); add(2.05,.22,.18,darkM,0,.42,-2.2); add(.8,.14,.06,darkM,0,.72,2.16); add(.5,.16,.04,plateM,0,.62,-2.18);
+ for(const sx of [-1,1]){
+  for(const pz of [.85,-1.15]) add(.1,.5,.12,body,sx*.88,1.3,pz);
+  add(.45,.18,.08,lightM,sx*.68,.78,2.16); add(.45,.18,.08,tailM,sx*.68,.78,-2.16); add(.12,.1,.22,body,sx*1.0,1.25,.8);
+  for(const wz of [1.3,-1.35]){
+   const w=new THREE.Mesh(new THREE.CylinderGeometry(.36,.36,.26,14),darkM); w.rotation.z=Math.PI/2; w.position.set(sx*1.0,.36,wz); g.add(w);
+   const hub=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.28,10),silverM); hub.rotation.z=Math.PI/2; hub.position.set(sx*1.0,.36,wz); g.add(hub);
+  }
+ }
+ return g;
+}
+const cars=[], carColors=[0x4a83d8,0xe4d6b6,0xd94c42,0x4d9b70,0xe0a23c,0x8a6bc4,0x2f3a4a,0xf2f2f2], CAR_LOOP=140;
+// 日本式の左側通行：+Z向き=x+4.25、−Z向き=x−4.25（各車線4台・等間隔）
+for(const cx of [0,-56,56]) for(let i=0;i<(cx===0?8:4);i++){
+ const n=cx===0?4:2, dir=i<n?1:-1, k=i%n, laneX=cx+(dir>0?4.25:-4.25);
+ const g=makeCar(carColors[(i+(cx?3:0)+(cx>0?2:0))%8]);
+ g.position.set(laneX,0,-70+k*(CAR_LOOP/n)+(dir>0?0:17)+(cx<0?8:0)); g.rotation.y=dir>0?0:Math.PI; scene.add(g);
+ cars.push({g,dir,laneX,speed:4.2,v:4.2});
+}
+
+// Three goofy street punks to bonk with flying yakisoba bread.
+const enemies=[];
+function makeEnemy(x,z,shirtColor){
+ const g=new THREE.Group(), skinE=mat(0xd9a07a), dk=mat(0x1a1416), redM=mat(0xb01818,.4), wh=mat(0xffffff,.5);
+ const body=new THREE.Mesh(new THREE.BoxGeometry(.95,1.1,.55),mat(shirtColor)); body.position.y=1.25; body.castShadow=true; g.add(body);
+ for(const s of [-1,1]){ const arm=new THREE.Mesh(new THREE.BoxGeometry(.22,.85,.22),mat(shirtColor)); arm.position.set(s*.6,1.25,.05); g.add(arm);
+  const fist=new THREE.Mesh(new THREE.SphereGeometry(.17,8,8),skinE); fist.position.set(s*.6,.75,.1); g.add(fist); }
+ const face=new THREE.Mesh(new THREE.SphereGeometry(.5,12,10),skinE); face.position.y=2.12; face.scale.set(1.05,.95,.95); face.castShadow=true; g.add(face);
+ for(let i=0;i<5;i++){ const sp=new THREE.Mesh(new THREE.ConeGeometry(.12,.45,5),dk); sp.position.set(0,2.62-Math.abs(i-2)*.07,(i-2)*.16); sp.rotation.x=(i-2)*.1; g.add(sp); } // モヒカン
+ for(const s of [-1,1]){
+  const e=new THREE.Mesh(new THREE.SphereGeometry(.11,8,8),wh); e.position.set(s*.2,2.15,.42); e.scale.set(1.1,.7,.5); g.add(e);
+  const pu=new THREE.Mesh(new THREE.SphereGeometry(.055,8,8),redM); pu.position.set(s*.2,2.15,.5); g.add(pu); // 赤い目
+  const br=new THREE.Mesh(new THREE.BoxGeometry(.34,.085,.07),dk); br.position.set(s*.2,2.3,.46); br.rotation.z=s*.55; g.add(br); // つり上がった眉
+ }
+ const scar=new THREE.Mesh(new THREE.BoxGeometry(.035,.42,.03),redM); scar.position.set(-.22,2.12,.5); scar.rotation.z=.5; g.add(scar);
+ const mouthMesh=new THREE.Mesh(new THREE.TorusGeometry(.17,.04,5,12,Math.PI),dk); mouthMesh.position.set(0,1.88,.46); g.add(mouthMesh); // への字口
+ for(let i=-2;i<=2;i++){ const t=new THREE.Mesh(new THREE.BoxGeometry(.05,.09,.03),wh); t.position.set(i*.065,1.9,.485); g.add(t); } // 歯
+ const bc=new THREE.Mesh(new THREE.ConeGeometry(.45,1,6),new THREE.MeshBasicMaterial({color:0xff3030,depthTest:false,transparent:true,opacity:.9})); bc.rotation.x=Math.PI; bc.position.y=3.9; bc.renderOrder=999; bc.visible=false; g.add(bc);
+ g.position.set(x,0,z); scene.add(g); enemies.push({g,alive:true,stun:0,phase:Math.random()*6,bc});
+}
+[[-5,40,0x9a4141],[4,20,0x784da8],[-3,-5,0x3c8a68],[5,-30,0xc98a2b],[-4,-55,0x3b6ea8],[28,28,0xa84a82],[-30,-14,0x4a4a4a],[26,-42,0x2e8b8b],[56,30,0xb85c2a],[-56,5,0x5a3b8c],[54,-35,0x2a7a4a],[-58,48,0x8a2a2a]].forEach(e=>makeEnemy(...e));
+const projectiles=[];
+function throwBread(){
+ if(!playing || score<=0) return;
+ score--;
+ const special=!onGround; // ジャンプ中なら必殺技：貫通する5連パンの扇
+ for(const a of (special?[-.5,-.25,0,.25,.5]:[0])){
+  const ball=createBread(); ball.scale.setScalar(special?1.1:.7);
+  const r=player.rotation.y+a;
+  ball.position.set(player.position.x,player.position.y+2.25,player.position.z);
+  scene.add(ball);
+  projectiles.push({mesh:ball,dir:new THREE.Vector3(Math.sin(r),0,Math.cos(r)),life:special?1.8:2.0,pierce:special,speed:special?26:17});
+ }
+ updateHUD();
+ sfx[special?'special':'throw']();message.textContent=special?'必殺！ジャンピング焼きそばパンバースト！！':'焼きそばパン発射！！';
+}
+let camYaw=Math.PI,walkPhase=0,swing=0,boost=0;
+let level=1,pendingLevel=0,pickCount=0,kills=0,mission=null,missionCd=15,hasRadar=false; const extra=[];
+let score=0,time=150,playing=false,finished=false,vy=0,onGround=true,hitCooldown=0,lastPickupLine=-1;
+const pickupLines=[
+ 'うまっ！矢加部、補給完了！','焼きそばパンGETだぜ！','炭水化物こそ正義！',
+ 'そのパン、いただき！','矢加部の胃袋は宇宙だ！','ソースの香りが呼んでいる！',
+ 'パンは力なり！','これは……うまい！','一口で元気100倍！',
+ '焼きそばパン、確保ォ！','腹が減っては戦えぬ！','矢加部、食べるのが仕事！',
+ 'ソースがしみるぜ……！','まだまだ食べられる！','パン補給！反撃開始！'
+];
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Space')jump();if(e.code==='KeyE')throwBread();});
+addEventListener('keyup',e=>keys[e.code]=false);
+function jump(){if(playing&&onGround){vy=8.5;onGround=false;sfx.jump();}}
+document.getElementById('jump').addEventListener('pointerdown',e=>{e.preventDefault();jump();});
+document.getElementById('throw').addEventListener('pointerdown',e=>{e.preventDefault();throwBread();});
+let joy={x:0,y:0}; const touch=document.getElementById('touch'), stick=document.getElementById('stick');
+let dragging=false;
+touch.addEventListener('pointerdown',e=>{dragging=true;touch.setPointerCapture(e.pointerId);moveJoy(e);});
+touch.addEventListener('pointermove',e=>{if(dragging)moveJoy(e);});
+function moveJoy(e){const r=touch.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),len=Math.hypot(dx,dy),k=Math.min(1,48/Math.max(1,len));joy.x=dx*k/48;joy.y=dy*k/48;stick.style.transform=`translate(${joy.x*42}px,${joy.y*42}px)`;}
+function endJoy(){dragging=false;joy.x=joy.y=0;stick.style.transform='translate(0,0)';}
+touch.addEventListener('pointerup',endJoy);touch.addEventListener('pointercancel',endJoy);
+const stats=document.getElementById('stats'),message=document.getElementById('message'),overlay=document.getElementById('overlay');
+function reset(){
+ score=0;time=150;vy=0;onGround=true;hitCooldown=0;lastPickupLine=-1;finished=false;playing=true;boost=0;
+ if(pendingLevel){level=pendingLevel;pendingLevel=0;}
+ time=Math.max(100,150-10*(level-1)); mission=null; missionCd=6; pickCount=0; kills=0; missionEl.style.display='none';
+ cars.forEach(c=>c.speed=4.2*(1+.2*(level-1)));
+ extra.forEach(e=>{scene.remove(e.g);enemies.splice(enemies.indexOf(e),1);}); extra.length=0;
+ for(let i=0;i<(level-1)*4;i++){ const cx=[0,-56,56][Math.floor(Math.random()*3)]; makeEnemy(cx+(Math.random()<.5?-1:1)*(6.5+Math.random()*2.5),-60+Math.random()*100,[0x8a2a2a,0x2a2a8a,0x2a6a2a,0x6a2a6a][i%4]); extra.push(enemies[enemies.length-1]); }
+ hasRadar=false; setRadar(false);player.position.set(0,0,60);player.rotation.y=Math.PI;camYaw=Math.PI;
+ pickups.forEach(p=>{p.visible=true;}); obstacles.forEach(o=>o.visible=true);
+ enemies.forEach(e=>{e.alive=true;e.g.visible=true;e.stun=0;});
+ projectiles.forEach(p=>scene.remove(p.mesh));projectiles.length=0;
+ message.textContent='焼きそばパンを集めろ！'; message.style.display='block';
+ overlay.style.display='none'; updateHUD();
+}
+function updateHUD(){const defeated=enemies.filter(e=>!e.alive).length;stats.textContent=`LV${level}　|　パン ${score}　|　敵 ${defeated} / ${enemies.length}　|　残り ${Math.ceil(time)}秒${boost>0?'　|　⚡ダッシュ！':''}`;}
+function endGame(win){
+ playing=false;finished=true;mission=null;missionEl.style.display='none';
+ message.textContent=win?'完全勝利！矢加部、伝説になる。':'タイムアップ！矢加部、出直しだ。';
+ overlay.style.display='flex';
+ document.querySelector('#card h1').textContent=win?'YAKABE LEGEND!':'YAKABE RETRY!';
+ document.querySelector('#card p').innerHTML=win?'街のワル12人を撃退した！<br>矢加部、パン投げ伝説になる。<br>次はもっと難しい LEVEL '+(level+1)+' に挑戦だ！':`倒した敵：${enemies.filter(e=>!e.alive).length} / ${enemies.length}<br>集めたパン：${score}個<br>もう一回チャレンジしよう！`;
+ document.getElementById('start').textContent=win?`LEVEL ${level+1} に挑戦！`:'もう一度プレイ！'; pendingLevel=win?level+1:0; sfx[win?'win':'lose']();
+}
+window.__start=()=>{audioInit();if(!playing)reset();};
+document.getElementById('restart').onclick=reset;
+
+function avoidCars(pos){ for(const c of cars){ const dx=pos.x-c.g.position.x, dz=pos.z-c.g.position.z; if(Math.abs(dx)<1.8&&Math.abs(dz)<3){ pos.x=c.g.position.x+(dx<0?-1:1)*1.8; } } }
+let userYaw=0,userPitch=0,zoom=1,camIdle=0; const ptrs=new Map(), cv=renderer.domElement; cv.style.touchAction='none';
+cv.addEventListener('pointerdown',e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});cv.setPointerCapture(e.pointerId);camIdle=0;});
+cv.addEventListener('pointermove',e=>{const q=ptrs.get(e.pointerId);if(!q)return;camIdle=0;
+ if(ptrs.size===2){const o=[...ptrs.entries()].find(([id])=>id!==e.pointerId)[1];const d0=Math.hypot(q.x-o.x,q.y-o.y),d1=Math.hypot(e.clientX-o.x,e.clientY-o.y);zoom=THREE.MathUtils.clamp(zoom*d0/Math.max(d1,1),.5,2);}
+ else{userYaw-=(e.clientX-q.x)*.008;userPitch=THREE.MathUtils.clamp(userPitch+(e.clientY-q.y)*.006,-.45,.75);}
+ q.x=e.clientX;q.y=e.clientY;});
+for(const ev of ['pointerup','pointercancel']) cv.addEventListener(ev,e=>ptrs.delete(e.pointerId));
+cv.addEventListener('wheel',e=>{zoom=THREE.MathUtils.clamp(zoom*(1+Math.sign(e.deltaY)*.08),.5,2);},{passive:true});
+// ---- 音：WebAudioで合成（素材ファイル不要）
+let AC=null,master=null,muted=false,bgmStep=0;
+function audioInit(){ if(AC){ if(AC.state==='suspended') AC.resume(); return; }
+ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); master=AC.createGain(); master.gain.value=.45; master.connect(AC.destination); setInterval(bgm,190); }catch(e){} }
+for(const ev of ['pointerdown','touchend','keydown']) addEventListener(ev,audioInit,{passive:true});
+function tone(f,d=.15,type='square',v=.18,slide=0,delay=0){ if(!AC||muted) return; const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();
+ o.type=type; o.frequency.setValueAtTime(f,t); if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(30,f+slide),t+d);
+ g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(.001,t+d); o.connect(g); g.connect(master); o.start(t); o.stop(t+d+.02); }
+function noise(d=.2,v=.25){ if(!AC||muted) return; const n=Math.floor(AC.sampleRate*d),b=AC.createBuffer(1,n,AC.sampleRate),a=b.getChannelData(0);
+ for(let i=0;i<n;i++) a[i]=(Math.random()*2-1)*(1-i/n); const s=AC.createBufferSource(),g=AC.createGain(); s.buffer=b; g.gain.value=v; s.connect(g); g.connect(master); s.start(); }
+const seq=(notes,type='triangle',gap=.1,v=.2)=>notes.forEach((f,i)=>tone(f,.16,type,v,0,i*gap));
+const sfx={
+ pickup:()=>seq([660,990],'square',.07,.14), jump:()=>tone(300,.16,'square',.1,300), throw:()=>tone(520,.2,'sawtooth',.12,-400),
+ special:()=>{tone(200,.5,'sawtooth',.2,700);noise(.4,.25);seq([523,659,784,1047],'square',.06,.14);}, hit:()=>{noise(.25,.3);tone(130,.25,'sawtooth',.22,-80);},
+ bump:()=>tone(100,.2,'square',.22,-50), mission:()=>seq([523,659,784],'triangle',.12), clear:()=>seq([523,659,784,1047,1319],'triangle',.09,.22),
+ fail:()=>tone(330,.5,'sawtooth',.15,-200), win:()=>seq([523,659,784,659,784,1047,1319],'triangle',.13,.25), lose:()=>seq([440,392,330,262],'sawtooth',.2,.14) };
+const bassN=[110,0,110,0,147,0,131,0,110,0,110,0,165,0,147,0], leadN=[440,0,523,0,587,0,523,440,392,0,440,0,523,587,659,0];
+function bgm(){ if(!playing) return; const i=bgmStep++%16, k=1+.12*(level-1); if(bassN[i]) tone(bassN[i]*k,.22,'triangle',.2); if(leadN[i]) tone(leadN[i]*k,.13,'square',.05); }
+const muteBtn=document.getElementById('mute'); muteBtn.addEventListener('click',()=>{muted=!muted;muteBtn.textContent=muted?'🔇':'🔊';});
+// ---- ミッション（時々発生・クリアでパン+5個）
+const missionEl=document.getElementById('mission');
+// ---- ワル発見ツール：レーダー（カメラの向きが上）。範囲外のワルは縁に表示。最寄りは大きく点滅。
+const nearest={d:999,e:null}, radar=document.getElementById('radar'), rctx=radar.getContext('2d'), radarTxt=document.getElementById('radarTxt');
+function scanFoes(){ nearest.d=999; nearest.e=null; for(const e of enemies){ if(!e.alive) continue; const d=Math.hypot(e.g.position.x-player.position.x,e.g.position.z-player.position.z); if(d<nearest.d){nearest.d=d;nearest.e=e;} } }
+function setRadar(on){ radar.style.display=radarTxt.style.display=on?'block':'none'; enemies.forEach(e=>{ if(e.bc) e.bc.visible=on; }); }
+function drawRadar(){
+ if(!hasRadar) return;
+ scanFoes();
+ const W=radar.width,c=W/2,R=c-8,RANGE=70,yaw=camYaw+userYaw,fx=Math.sin(yaw),fz=Math.cos(yaw);
+ rctx.clearRect(0,0,W,W); rctx.strokeStyle='#7dffb066'; rctx.lineWidth=2;
+ for(const r of [R,R/2]){ rctx.beginPath(); rctx.arc(c,c,r,0,7); rctx.stroke(); }
+ const pulse=.6+.4*Math.sin(performance.now()/150);
+ for(const e of enemies){ if(!e.alive) continue;
+  const rx=e.g.position.x-player.position.x, rz=e.g.position.z-player.position.z;
+  let px=(-rx*fz+rz*fx)*R/RANGE, py=-(rx*fx+rz*fz)*R/RANGE; const m=Math.hypot(px,py); if(m>R){px*=R/m;py*=R/m;}
+  rctx.fillStyle=e===nearest.e?`rgba(255,${Math.round(60+120*pulse)},60,1)`:'#ff4040'; rctx.beginPath(); rctx.arc(c+px,c+py,e===nearest.e?10:6,0,7); rctx.fill();
+ }
+ rctx.save(); rctx.translate(c,c); rctx.rotate(yaw-player.rotation.y); rctx.fillStyle='#fff'; rctx.beginPath(); rctx.moveTo(0,-12); rctx.lineTo(8,9); rctx.lineTo(-8,9); rctx.fill(); rctx.restore();
+ radarTxt.textContent=nearest.e?`🔍 最寄りのワル ${Math.round(nearest.d)}m`:'';
+}
+function newMission(){
+ const left=pickups.filter(p=>p.visible).length, foes=enemies.filter(e=>e.alive).length, opts=[];
+ if(left>=4) opts.push('bread'); if(foes>=3) opts.push('foe'); if(foes>=1&&hasRadar) opts.push('find'); if(!opts.length){ missionCd=10; return; }
+ const type=(!hasRadar&&left>=3)?'tool':opts[Math.floor(Math.random()*opts.length)], n=type==='bread'?3:(type==='foe'||type==='tool')?2:1, t=type==='tool'?25:type==='find'?Math.max(25,40-3*(level-1)):type==='bread'?Math.max(20,30-3*(level-1)):Math.max(25,35-3*(level-1));
+ mission={type,n,time:t,base:(type==='bread'||type==='tool')?pickCount:kills}; sfx.mission();
+ message.textContent=`ミッション発生！${t}秒以内に${lab(type,n)}！（クリアでパン+5個${type==='tool'?'＋ワル発見ツール':''}）`;
+}
+const lab=(t,n)=>t==='tool'?'パンを'+n+'個集めてワル発見ツールをゲット':t==='bread'?'パンを'+n+'個集めろ':t==='foe'?'ワルを'+n+'人倒せ':'ワル発見ツールで最寄りのワルを見つけて近づけ';
+function updateMission(dt){
+ scanFoes();
+ if(!mission){ missionCd-=dt; if(missionCd<=0) newMission(); return; }
+ mission.time-=dt;
+ const prog=mission.type==='find'?(nearest.d<9?1:0):((mission.type==='bread'||mission.type==='tool')?pickCount:kills)-mission.base;
+ if(prog>=mission.n){ score+=5; sfx.clear(); message.textContent=mission.type==='tool'?'ミッション達成！パン+5個＋🔍ワル発見ツールGET！':'ミッション達成！報酬：パン+5個GET！'; if(mission.type==='tool'){hasRadar=true;setRadar(true);} mission=null; missionCd=18+Math.random()*12; missionEl.style.display='none'; return; }
+ if(mission.time<=0){ sfx.fail(); message.textContent='ミッション失敗…'; mission=null; missionCd=15; missionEl.style.display='none'; return; }
+ missionEl.style.display='block';
+ missionEl.textContent=`🎯 ${lab(mission.type,mission.n)}！ ${prog}/${mission.n}　⏱${Math.ceil(mission.time)}秒　🎁クリアでパン+5個${mission.type==='tool'?'＋🔍ツール':''}`;
+}
+const clock=new THREE.Clock();
+function animate(){
+ requestAnimationFrame(animate);
+ const dt=Math.min(clock.getDelta(),.066), t=clock.elapsedTime;
+ if(playing){
+  time-=dt;if(time<=0){time=0;updateHUD();endGame(false); }
+  // 操作：A/D で旋回、W/S で前進・後退（矢加部の向きが基準）
+  const fwd=THREE.MathUtils.clamp((keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)-joy.y,-1,1);
+  const turn=THREE.MathUtils.clamp((keys.KeyA||keys.ArrowLeft?1:0)-(keys.KeyD||keys.ArrowRight?1:0)-joy.x,-1,1);
+  player.rotation.y+=turn*2.7*dt;
+  const spd=(fwd>=0?7.4:4.2)*(boost>0?1.6:1);
+  mv(player.position,Math.sin(player.rotation.y)*fwd*spd*dt,Math.cos(player.rotation.y)*fwd*spd*dt);
+  if(!onGround){vy-=19*dt;player.position.y+=vy*dt;if(player.position.y<=0){player.position.y=0;vy=0;onGround=true;}}
+  // 歩行アニメ：左右の足と腕を交互に振る（腕は反対側の足と同期）
+  const moving=Math.abs(fwd)>.05&&onGround;
+  swing+=((moving?1:0)-swing)*Math.min(1,dt*12);
+  if(moving) walkPhase+=dt*12*fwd*(boost>0?1.4:1);
+  const sw=Math.sin(walkPhase)*swing;
+  leftLeg.rotation.x=sw*.85; rightLeg.rotation.x=-sw*.85;
+  leftArm.rotation.x=-sw*.75; rightArm.rotation.x=sw*.75;
+  const bob=Math.abs(Math.cos(walkPhase))*.07*swing;
+  torso.position.y=1.58+bob; headG.position.y=bob; leftArm.position.y=rightArm.position.y=1.88+bob;
+  pickups.forEach(p=>{if(p.visible){p.rotation.y+=dt*2.5;p.position.y=.9+Math.sin(t*3+p.position.z)*.12;if(player.position.distanceTo(p.position)<1.25){p.visible=false;score++;pickCount++;sfx.pickup();boost=Math.min(boost+5,12);updateHUD();let lineIndex=Math.floor(Math.random()*pickupLines.length);
+ while(lineIndex===lastPickupLine) lineIndex=(lineIndex+1)%pickupLines.length;
+ lastPickupLine=lineIndex;message.textContent=pickupLines[lineIndex];if(score===pickups.length)message.textContent='パン満タン！Eキーで敵にぶつけろ！';}}});
+  obstacles.forEach(o=>{if(o.visible&&hitCooldown<=0&&Math.hypot(player.position.x-o.position.x,player.position.z-o.position.z)<1.15&&player.position.y<1.1){hitCooldown=1.0;mv(player.position,0,.8);sfx.bump();message.textContent='うわっ！コーンに激突！！';}});
+  // Enemies wander toward the player. A direct bread hit knocks them out.
+  enemies.forEach(e=>{
+   if(!e.alive) return;
+   if(e.stun>0){e.stun-=dt;return;}
+   const dx=player.position.x-e.g.position.x, dz=player.position.z-e.g.position.z, dist=Math.hypot(dx,dz);
+   const lv=level-1;
+   if(dist<20+5*lv&&dist>1.8) mv(e.g.position,dx/dist*dt*.9*(1+.3*lv),dz/dist*dt*.9*(1+.3*lv));
+   for(const c of cars){ const dl=e.g.position.x-c.laneX, ah=(e.g.position.z-c.g.position.z)*c.dir; if(Math.abs(dl)<2.3&&ah>-3&&ah<16) mv(e.g.position,(dl<0?-1:1)*dt*5,0); } // 車が来たら車線から飛び出して避ける
+   avoidCars(e.g.position);
+   e.g.rotation.y=Math.atan2(dx,dz);
+   e.g.position.y=Math.abs(Math.sin(t*5+e.phase))*.06;
+   if(dist<1.25&&hitCooldown<=0){hitCooldown=1.0;mv(player.position,-dx/(dist||1)*.9,-dz/(dist||1)*.9);sfx.bump();message.textContent='ワルにぶつかられた！逃げろ！';}
+  });
+  for(let i=projectiles.length-1;i>=0;i--){
+   const p=projectiles[i];p.life-=dt;
+   p.mesh.position.addScaledVector(p.dir,dt*p.speed);
+   p.mesh.rotation.x+=dt*8;p.mesh.rotation.z+=dt*6;
+   let hit=false;
+   for(const e of enemies){
+    if(!e.alive) continue;
+    const d=Math.hypot(p.mesh.position.x-e.g.position.x,p.mesh.position.z-e.g.position.z,p.pierce?0:p.mesh.position.y-(e.g.position.y+1.6));
+    if(d<(p.pierce?1.9:1.0)){
+     e.alive=false;e.g.visible=false;kills++;sfx.hit();
+     message.textContent=p.pierce?'必殺技が炸裂！！まとめてぶっ飛ばした！':'命中！！ワルを撃退した！';
+     if(!p.pierce){hit=true;break;}
+    }
+   }
+   if(hit||p.life<=0||!walk(p.mesh.position.x,p.mesh.position.z)){scene.remove(p.mesh);projectiles.splice(i,1);}
+  }
+  if(enemies.every(e=>!e.alive)) endGame(true);
+  hitCooldown=Math.max(0,hitCooldown-dt); boost=Math.max(0,boost-dt);
+  cars.forEach(c=>{
+   // 同じ車線の前の車との車間距離を測り、近づいたら減速・停止（重ならない）
+   let gap=Infinity;
+   for(const o of cars){
+    if(o===c||o.laneX!==c.laneX) continue;
+    let d=((o.g.position.z-c.g.position.z)*c.dir)%CAR_LOOP; if(d<0)d+=CAR_LOOP;
+    gap=Math.min(gap,d);
+   }
+   const blockedBy=(q,r=7)=>{const ah=(q.z-c.g.position.z)*c.dir;return Math.abs(q.x-c.laneX)<1.8&&ah>0&&ah<r;};
+   const pedestrianInFront=(blockedBy(player.position)&&player.position.y<1.8)||enemies.some(e=>e.alive&&blockedBy(e.g.position,4.5));
+   const target=pedestrianInFront?0:c.speed*THREE.MathUtils.clamp((gap-9)/7,0,1);
+   c.v+=(target-c.v)*Math.min(1,dt*4);
+   c.g.position.z+=c.dir*c.v*dt;
+   if(c.g.position.z>70)c.g.position.z-=CAR_LOOP;
+   if(c.g.position.z<-70)c.g.position.z+=CAR_LOOP;
+  });
+  updateMission(dt);drawRadar();
+  updateHUD();
+ }
+ sun.position.set(player.position.x-18,32,player.position.z+14);sun.target.position.copy(player.position);sun.target.updateMatrixWorld();
+ // カメラ：矢加部の向きに合わせて滑らかに背後へ回り込む
+ const dy=Math.atan2(Math.sin(player.rotation.y-camYaw),Math.cos(player.rotation.y-camYaw));
+ camYaw+=dy*(1-Math.exp(-dt*4));
+ camIdle+=dt; if(camIdle>2){const k=Math.exp(-dt*1.5);userYaw*=k;userPitch*=k;}
+ const yaw=camYaw+userYaw, el=THREE.MathUtils.clamp(.55+userPitch,.12,1.3), r=12.3*zoom;
+ const target=new THREE.Vector3(player.position.x+Math.sin(yaw)*2.5,player.position.y+1.7,player.position.z+Math.cos(yaw)*2.5);
+ const camDesired=new THREE.Vector3(player.position.x-Math.sin(yaw)*Math.cos(el)*r,player.position.y+Math.sin(el)*r,player.position.z-Math.cos(yaw)*Math.cos(el)*r);
+ camera.position.lerp(camDesired,1-Math.exp(-dt*7));camera.lookAt(target);
+ renderer.render(scene,camera);
+}
+window.__yakabeReady=true;{const er=document.getElementById('err');if(er)er.remove();} if(window.__want) window.__start();
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+})().catch(e=>window.__fatal(String(e&&e.message||e)));
+</script>
+</body>
+</html>

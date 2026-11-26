@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>矢加部のパン投げチャレンジ</title>
+<style>
+:root{--bg1:#8fd3ff;--bg2:#ffe9b8;--fg:#1c2230;--card:#ffffffe6;--cell:#6a7079;--accent:#e8453c;
+ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg1:#10183a;--bg2:#3a2347;--fg:#f4f6fb;--card:#1b2029ee;--cell:#2d333f;color-scheme:dark;}}
+:root[data-theme="dark"]{--bg1:#10183a;--bg2:#3a2347;--fg:#f4f6fb;--card:#1b2029ee;--cell:#2d333f;color-scheme:dark;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;background:linear-gradient(var(--bg1),var(--bg2)) fixed;color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",Meiryo,sans-serif;user-select:none;-webkit-user-select:none;touch-action:manipulation;display:flex;justify-content:center;}
+#app{width:100%;max-width:460px;padding:14px 14px 24px;position:relative;}
+h1{margin:4px 0 8px;font-size:20px;text-align:center;}
+.hud{display:flex;justify-content:space-between;align-items:flex-end;font-weight:900;}
+.hud .s{font-size:34px;line-height:1;} .hud small{font-size:12px;opacity:.7;display:block;}
+#combo{color:var(--accent);font-size:16px;min-height:22px;text-align:right;}
+.bar{height:10px;border-radius:99px;background:#0003;margin:8px 0 14px;overflow:hidden;} #bar{height:100%;width:100%;background:linear-gradient(90deg,#ffb23f,#e8453c);}
+#grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+#grid.shake{animation:sh .3s;} @keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.cell{position:relative;aspect-ratio:1;border:0;padding:0;border-radius:22px;background:var(--cell);box-shadow:inset 0 -9px 0 #0005,inset 0 6px 14px #0006;overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.ch{position:absolute;inset:8px 8px 0;border-radius:18px 18px 0 0;display:grid;place-items:center;font-size:clamp(40px,13vw,64px);transform:translateY(105%);transition:transform .07s;}
+.cell.on .ch{transform:translateY(0);} .foe .ch{background:#ff7a6b;} .civ .ch{background:#74bcff;} .boss .ch{background:linear-gradient(#ffe066,#ffb000);}
+.pop{position:absolute;left:50%;top:30%;transform:translateX(-50%);font-weight:900;font-size:22px;color:#fff;text-shadow:0 2px 0 #0008,0 0 8px #000a;pointer-events:none;animation:up .6s forwards;z-index:3;}
+@keyframes up{to{transform:translate(-50%,-46px);opacity:0}}
+.legend{display:flex;justify-content:center;gap:12px;font-size:12px;margin-top:14px;opacity:.85;flex-wrap:wrap;}
+#ov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0007;padding:16px;z-index:5;}
+.box{width:100%;max-width:400px;background:var(--card);border-radius:22px;padding:22px 20px;text-align:center;box-shadow:0 20px 50px #0006;backdrop-filter:blur(6px);}
+.box h2{margin:0 0 6px;font-size:24px;} .box p{margin:6px 0;font-size:14px;line-height:1.6;}
+.big{font-size:56px;font-weight:900;color:var(--accent);line-height:1.1;}
+button.go{margin-top:12px;border:0;border-radius:999px;background:var(--accent);color:#fff;font-weight:900;font-size:18px;padding:12px 34px;cursor:pointer;}
+.stats{display:flex;justify-content:center;gap:16px;font-size:13px;margin:8px 0;} .rank{font-size:18px;font-weight:900;margin-top:4px;}
+</style>
+</head>
+<body>
+<div id="app">
+ <h1>🍞 矢加部のパン投げチャレンジ</h1>
+ <div class="hud"><div><small>スコア</small><span class="s" id="score">0</span></div><div id="combo"></div><div><small>ベスト</small><span id="best">0</span></div></div>
+ <div class="bar"><div id="bar"></div></div>
+ <div id="grid"></div>
+ <div class="legend"><span>😠 ワル＝タップ！</span><span>😈 金ワル＝高得点</span><span>🧓 通行人＝触るな！</span></div>
+</div>
+<div id="ov"><div class="box" id="box"></div></div>
+
+<script>
+(function(){
+var $=function(id){return document.getElementById(id);};
+var T=30000, cells=[], running=false, t0=0, nextSpawn=0, score=0, combo=0, maxCombo=0, hits=0, rts=[], best=0, AC=null;
+try{ best=+localStorage.getItem("yk_best")||0; }catch(e){}
+$("best").textContent=best;
+var grid=$("grid");
+for(var i=0;i<9;i++){ var b=document.createElement("button"); b.className="cell"; b.dataset.i=i; b.innerHTML='<div class="ch"></div>'; grid.appendChild(b); cells.push({b:b,ch:b.firstChild,a:null}); }
+
+function tone(f,d,type,v,slide){ if(!AC) return; var t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain(); o.type=type||"square"; o.frequency.setValueAtTime(f,t); if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(40,f+slide),t+d); g.gain.setValueAtTime(v||.15,t); g.gain.exponentialRampToValueAtTime(.001,t+d); o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t+d+.02); }
+function initAudio(){ try{ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==="suspended") AC.resume(); }catch(e){} }
+function vib(n){ try{ if(navigator.vibrate) navigator.vibrate(n); }catch(e){} }
+function pop(c,text){ var p=document.createElement("div"); p.className="pop"; p.textContent=text; c.b.appendChild(p); setTimeout(function(){ p.remove(); },600); }
+function clearCell(c){ c.a=null; c.b.className="cell"; }
+
+function spawn(now){
+ var free=cells.filter(function(c){return !c.a;}); if(!free.length) return;
+ var c=free[Math.floor(Math.random()*free.length)], r=Math.random(), type=r<.08?"boss":r<.3?"civ":"foe", el=(now-t0)/1000;
+ var d=Math.max(450,1100-el*18)*(type==="boss"?.75:1);
+ c.a={type:type,born:now,until:now+d}; c.b.className="cell on "+type; c.ch.textContent=type==="foe"?"😠":type==="civ"?"🧓":"😈";
+}
+function hud(left){ $("score").textContent=score; $("bar").style.width=Math.max(0,left/T*100)+"%"; $("combo").textContent=combo>=2?combo+"コンボ！":""; }
+
+function tick(now){
+ if(!running) return;
+ var left=T-(now-t0); hud(left);
+ if(left<=0){ end(); return; }
+ if(now>=nextSpawn){ spawn(now); var el=(now-t0)/1000; nextSpawn=now+Math.max(260,820-el*14)*(.7+Math.random()*.6); }
+ cells.forEach(function(c){ if(c.a&&now>=c.a.until){ if(c.a.type!=="civ"){ combo=0; pop(c,"💨"); } clearCell(c); } });
+ requestAnimationFrame(tick);
+}
+grid.addEventListener("pointerdown",function(e){
+ var b=e.target.closest(".cell"); if(!b||!running) return; e.preventDefault();
+ var c=cells[+b.dataset.i], now=performance.now();
+ if(!c.a){ score=Math.max(0,score-2); combo=0; pop(c,"-2"); tone(150,.08,"square",.1); return; }
+ var a=c.a; clearCell(c);
+ if(a.type==="civ"){ score=Math.max(0,score-20); combo=0; pop(c,"-20"); tone(120,.3,"sawtooth",.2,-60); vib(120); grid.classList.remove("shake"); void grid.offsetWidth; grid.classList.add("shake"); return; }
+ var pts=a.type==="boss"?40:10+Math.min(combo,10)*2; combo+=a.type==="boss"?3:1; maxCombo=Math.max(maxCombo,combo);
+ score+=pts; hits++; rts.push(now-a.born); pop(c,"+"+pts);
+ tone(520+Math.min(combo,12)*40,.1,"square",.14); if(a.type==="boss") tone(1200,.2,"triangle",.15); vib(15);
+});
+
+function rankOf(s){ return s>=450?"🏆 矢加部伝説":s>=300?"🥇 街の守護神":s>=170?"🥈 パン投げ職人":s>=60?"🥉 パン投げ見習い":"🍞 まずは練習！"; }
+function showStart(){ $("ov").style.display="flex"; $("box").innerHTML='<h2>矢加部のパン投げチャレンジ</h2><p>穴から出てくる<b>ワル😠</b>を30秒間タップして撃退！<br>連続で当てるとコンボで高得点。<br><b>金のワル😈</b>は40点！<br><b>通行人🧓</b>に当てると-20点。</p><button class="go" id="go">スタート！</button>'; $("go").onclick=function(){ initAudio(); countdown(); }; }
+function countdown(){ var n=3; $("box").innerHTML='<div class="big" id="cd">3</div><p>じゅんび…</p>'; tone(440,.12); var iv=setInterval(function(){ n--; if(n>0){ $("cd").textContent=n; tone(440,.12); } else { clearInterval(iv); tone(880,.25,"triangle",.2); begin(); } },700); }
+function begin(){ $("ov").style.display="none"; cells.forEach(clearCell); score=0; combo=0; maxCombo=0; hits=0; rts=[]; hud(T); running=true; t0=performance.now(); nextSpawn=t0+400; requestAnimationFrame(tick); }
+function end(){
+ running=false; cells.forEach(clearCell); hud(0);
+ var avg=rts.length?Math.round(rts.reduce(function(a,b){return a+b;},0)/rts.length):0, newBest=score>best;
+ if(newBest){ best=score; try{ localStorage.setItem("yk_best",best); }catch(e){} $("best").textContent=best; }
+ tone(660,.15,"triangle",.2); setTimeout(function(){ tone(880,.15,"triangle",.2); },140); setTimeout(function(){ tone(1100,.3,"triangle",.2); },280);
+ $("ov").style.display="flex";
+ $("box").innerHTML='<h2>タイムアップ！</h2><div class="big">'+score+'</div><div class="rank">'+rankOf(score)+'</div>'+(newBest?'<p>🎉 ベスト更新！</p>':'')+'<div class="stats"><span>撃退 '+hits+'人</span><span>最大 '+maxCombo+'コンボ</span><span>平均 '+(avg?avg+"ms":"-")+'</span></div><button class="go" id="go">もう一度！</button>';
+ $("go").onclick=function(){ initAudio(); countdown(); };
+}
+showStart();
+})();
+</script>
+</body>
+</html>
